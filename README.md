@@ -17,10 +17,11 @@ O circuito possui:
 
 - [Visão geral](#-visão-geral)
 - [Entradas](#-entradas)
-  - [Velocidade](#-velocidade)
+  - [Velocidade](#️-velocidade)
   - [Freio](#-freio)
   - [Acelerador](#️-acelerador)
   - [Embreagem](#-embreagem)
+- [Resumo das tensões](#-resumo-das-tensões)
 - [74HC14](#-74hc14)
 - [Botão](#-botão)
 - [Display OLED](#-display-oled)
@@ -50,6 +51,8 @@ O circuito é dividido nos seguintes blocos:
 ---
 
 ## 📡 Entradas
+
+> ℹ️ As tensões de entrada abaixo são **aproximadas**. As tensões no pino foram **calculadas** a partir dos resistores do divisor: `Vpino = Ventrada × R_baixo ÷ (R_cima + R_baixo)`.
 
 ### 🏍️ Velocidade
 
@@ -81,6 +84,14 @@ Sinal de velocidade
 | R1         | 10 KΩ  |
 | R2         | 1 KΩ   |
 | R3         | 2,2 KΩ |
+
+**Tensões**
+
+| Ponto                    | Tensão       |
+|--------------------------|--------------|
+| Entrada (sinal da moto)  | ~12 V        |
+| No pino 1A do 74HC14     | ~2,9 V       |
+| Saída 1Y (vai ao ESP32)  | 0 V ou 3,3 V |
 
 A saída **1Y** do 74HC14 é conectada ao **GPIO 25** do ESP32.
 
@@ -116,6 +127,14 @@ Sinal de freio
 | R2         | 10 KΩ  |
 | C1         | 100 nF |
 
+**Tensões**
+
+| Ponto                    | Tensão       |
+|--------------------------|--------------|
+| Entrada (sinal da moto)  | ~12 V        |
+| No pino 2A do 74HC14     | ~2,45 V      |
+| Saída 2Y (vai ao ESP32)  | 0 V ou 3,3 V |
+
 A saída **2Y** do 74HC14 é conectada ao **GPIO 4**.
 
 ---
@@ -149,7 +168,16 @@ Sinal do acelerador
 | R1         | 20 KΩ |
 | R2         | 39 KΩ |
 
+**Tensões**
+
+| Ponto                    | Tensão                   |
+|--------------------------|--------------------------|
+| Entrada (sinal da moto)  | ~5 V                     |
+| No GPIO 32 (ADC)         | ~3,3 V (no máximo)       |
+
 O GPIO 32 é utilizado como entrada analógica para realizar a leitura da tensão do acelerador.
+
+> ⚠️ Com 5 V na entrada, o divisor entrega cerca de 3,3 V, que é o limite do ESP32. Se o sensor passar de 5 V, a leitura pode saturar.
 
 ---
 
@@ -187,7 +215,33 @@ Sinal da embreagem
 | R3         | 10 KΩ  |
 | C1         | 100 nF |
 
+**Tensões**
+
+| Ponto                    | Tensão       |
+|--------------------------|--------------|
+| Entrada (sinal da moto)  | ~5 V         |
+| No pino 4A do 74HC14     | ~3,5 V       |
+| Saída 4Y (vai ao ESP32)  | 0 V ou 3,3 V |
+
 A saída **4Y** do 74HC14 é conectada ao **GPIO 19**.
+
+> ℹ️ Os ~3,5 V no pino 4A ficam um pouco acima da alimentação de 3,3 V do 74HC14, mas dentro do limite do chip (VCC + 0,5 V = 3,8 V). Valor a confirmar com medição.
+
+---
+
+## 🔋 Resumo das tensões
+
+| Sinal      | Entrada (aprox.) | No pino (calculado) | Saída do 74HC14 / destino |
+|------------|------------------|---------------------|---------------------------|
+| Velocidade | ~12 V            | ~2,9 V              | 0 V ou 3,3 V → GPIO 25    |
+| Freio      | ~12 V            | ~2,45 V             | 0 V ou 3,3 V → GPIO 4     |
+| Acelerador | ~5 V             | ~3,3 V              | direto no GPIO 32 (ADC)   |
+| Embreagem  | ~5 V             | ~3,5 V              | 0 V ou 3,3 V → GPIO 19    |
+
+O 74HC14 **inverte** o sinal:
+
+- Sinal alto na entrada → saída em **0 V**
+- Sinal baixo na entrada → saída em **3,3 V**
 
 ---
 
@@ -198,24 +252,44 @@ O 74HC14 é utilizado para **condicionamento e inversão** dos sinais digitais d
 **Alimentação**
 
 ```text
-VCC → 3.3V
-GND → GND
+VCC (pino 14) → 3.3V
+GND (pino 7)  → GND
 ```
 
-Adicionar um capacitor de **100 nF** entre VCC e GND, preferencialmente próximo ao CI.
+**Capacitor de desacoplamento**
+
+Um capacitor de **100 nF** é ligado entre o **VCC (pino 14)** e o **GND (pino 7)**, o mais **próximo possível do CI**, para filtrar ruídos da alimentação.
+
+```text
+3.3V ────┬──────── VCC (pino 14)
+         │
+       100nF
+         │
+GND ─────┴──────── GND (pino 7)
+```
+
+**Entradas não utilizadas**
+
+O 74HC14 possui 6 portas e o circuito usa 3. As entradas livres devem ser ligadas ao **GND** para não ficarem flutuando:
+
+| Entrada livre | Pino |
+|---------------|------|
+| 3A            | 5    |
+| 5A            | 11   |
+| 6A            | 13   |
 
 **Pinout utilizado**
 
-| 74HC14 | Função             | ESP32   |
-|--------|--------------------|---------|
-| 1A     | Entrada velocidade | —       |
-| 1Y     | Saída velocidade   | GPIO 25 |
-| 2A     | Entrada freio      | —       |
-| 2Y     | Saída freio        | GPIO 4  |
-| 4A     | Entrada embreagem  | —       |
-| 4Y     | Saída embreagem    | GPIO 19 |
-| VCC    | Alimentação        | 3.3V    |
-| GND    | Alimentação        | GND     |
+| 74HC14 | Pino | Função             | ESP32   |
+|--------|------|--------------------|---------|
+| 1A     | 1    | Entrada velocidade | —       |
+| 1Y     | 2    | Saída velocidade   | GPIO 25 |
+| 2A     | 3    | Entrada freio      | —       |
+| 2Y     | 4    | Saída freio        | GPIO 4  |
+| 4Y     | 8    | Saída embreagem    | GPIO 19 |
+| 4A     | 9    | Entrada embreagem  | —       |
+| VCC    | 14   | Alimentação        | 3.3V    |
+| GND    | 7    | Alimentação        | GND     |
 
 ---
 
@@ -338,11 +412,11 @@ Os dois GPIOs são utilizados para controle PWM do driver.
 
 O circuito utiliza duas tensões principais:
 
-| Tensão | Utilização                          |
-|--------|-------------------------------------|
-| 3.3V   | ESP32, 74HC14 e OLED                |
+| Tensão | Utilização                             |
+|--------|----------------------------------------|
+| 3.3V   | ESP32, 74HC14 e OLED                   |
 | 5V     | B05005S-1W e lógica do driver do motor |
-| GND    | Referência comum do circuito        |
+| GND    | Referência comum do circuito           |
 
 > ⚠️ **Importante:** o sinal do acelerador é uma entrada analógica e deve permanecer conectado ao GPIO 32, sem passar pelo 74HC14.
 
