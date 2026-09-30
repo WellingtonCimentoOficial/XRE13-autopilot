@@ -449,12 +449,15 @@ A alimentação do circuito vem da moto, através de um conversor **LM2596**:
                                   ├──> BTS7960 (VCC, R_EN, L_EN)
                                   └──> B05005S-1W (pino 2)
 
-GND da moto ──────────────────────┬──> LM2596 (GND)
-                                  ├──> ESP32 (GND)
-                                  └──> BTS7960 (GND e borne B-)
+GND da moto ──> LM2596 (GND) ─────┬──> ESP32 (GND)
+                                  └──> BTS7960 (GND)
+
+GND da moto ──> BTS7960 (borne B-)
 ```
 
 O ESP32 é alimentado pelos pinos **VIN** e **GND**.
+
+> ℹ️ O GND da moto entra no **LM2596**, e o ESP32 já fica ligado ao GND por ele. Não é preciso puxar outro fio de GND da moto até o ESP32.
 
 O circuito utiliza três tensões:
 
@@ -463,7 +466,7 @@ O circuito utiliza três tensões:
 | 12V pós-chave | Entrada do LM2596 e borne B+ do BTS7960 (motor)              |
 | 5V            | ESP32 (VIN), BTS7960 (VCC, R_EN, L_EN) e B05005S-1W          |
 | 3.3V          | Lógica do ESP32, 74HC14 e OLED                               |
-| GND           | Referência comum do circuito (GND da moto)                   |
+| GND           | Referência comum do circuito (GND da moto, levado ao ESP32 pelo LM2596) |
 
 > ⚠️ **Importante:** o sinal do acelerador é uma entrada analógica e deve permanecer conectado ao GPIO 32, sem passar pelo 74HC14.
 
