@@ -270,16 +270,6 @@ Um capacitor de **100 nF** é ligado entre o **VCC (pino 14)** e o **GND (pino 7
 GND ─────┴──────── GND (pino 7)
 ```
 
-**Entradas não utilizadas**
-
-O 74HC14 possui 6 portas e o circuito usa 3. As entradas livres devem ser ligadas ao **GND** para não ficarem flutuando:
-
-| Entrada livre | Pino |
-|---------------|------|
-| 3A            | 5    |
-| 5A            | 11   |
-| 6A            | 13   |
-
 **Pinout utilizado**
 
 | 74HC14 | Pino | Função             | ESP32   |
