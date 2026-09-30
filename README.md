@@ -9,7 +9,8 @@ O circuito possui:
 - Isolamento do **botão** através de **B05005S-1W + PC817**
 - **Display OLED**
 - **LED de status**
-- Controle **PWM** do driver do motor
+- Controle **PWM** do driver do motor (**BTS7960**)
+- Alimentação por conversor **LM2596** (12 V → 5 V)
 
 ---
 
@@ -47,6 +48,7 @@ O circuito é dividido nos seguintes blocos:
 - 💡 LED de indicação
 - ⚙️ Controle do driver do motor
 - 🔄 Condicionamento de sinais através do 74HC14
+- 🔋 Alimentação com LM2596 (12 V → 5 V)
 
 ---
 
@@ -219,13 +221,13 @@ Sinal da embreagem
 
 | Ponto                    | Tensão       |
 |--------------------------|--------------|
-| Entrada (sinal da moto)  | ~5 V         |
-| No pino 4A do 74HC14     | ~3,5 V       |
+| Entrada (sinal da moto)  | 4,7 V        |
+| No pino 4A do 74HC14     | 3,3 V        |
 | Saída 4Y (vai ao ESP32)  | 0 V ou 3,3 V |
 
 A saída **4Y** do 74HC14 é conectada ao **GPIO 19**.
 
-> ℹ️ Os ~3,5 V no pino 4A ficam um pouco acima da alimentação de 3,3 V do 74HC14, mas dentro do limite do chip (VCC + 0,5 V = 3,8 V). Valor a confirmar com medição.
+> ℹ️ Com 4,7 V na entrada, o divisor entrega cerca de 3,3 V no pino 4A, igual à alimentação do 74HC14.
 
 ---
 
@@ -236,7 +238,7 @@ A saída **4Y** do 74HC14 é conectada ao **GPIO 19**.
 | Velocidade | ~12 V            | ~2,9 V              | 0 V ou 3,3 V → GPIO 25    |
 | Freio      | ~12 V            | ~2,45 V             | 0 V ou 3,3 V → GPIO 4     |
 | Acelerador | ~5 V             | ~3,3 V              | direto no GPIO 32 (ADC)   |
-| Embreagem  | ~5 V             | ~3,5 V              | 0 V ou 3,3 V → GPIO 19    |
+| Embreagem  | 4,7 V            | 3,3 V               | 0 V ou 3,3 V → GPIO 19    |
 
 O 74HC14 **inverte** o sinal:
 
@@ -371,14 +373,22 @@ GND
 
 ## ⚙️ Driver do motor
 
-O ESP32 controla o sentido e o acionamento do motor através de sinais **PWM**.
+O ESP32 controla o sentido e o acionamento do motor através do driver **BTS7960**, com sinais **PWM**.
 
-| Driver | Conexão |
-|--------|---------|
-| GND    | GND     |
-| VCC    | 5V      |
-| RPWM   | GPIO 27 |
-| LPWM   | GPIO 26 |
+**Motor utilizado:** JGY370, 12 V, 10 RPM.
+
+### Sinais e alimentação da lógica
+
+| Driver | Conexão                      |
+|--------|------------------------------|
+| GND    | GND                          |
+| VCC    | 5V (saída do LM2596)         |
+| R_EN   | 5V (saída do LM2596)         |
+| L_EN   | 5V (saída do LM2596)         |
+| RPWM   | GPIO 27                      |
+| LPWM   | GPIO 26                      |
+
+> ℹ️ Os pinos **R_EN** e **L_EN** precisam estar em nível alto para o driver funcionar. Ligados ao 5V, ficam sempre habilitados.
 
 **Sinais PWM**
 
@@ -388,6 +398,25 @@ GPIO 26 → LPWM
 ```
 
 Os dois GPIOs são utilizados para controle PWM do driver.
+
+### Borne de potência
+
+| Borne | Conexão                                                    |
+|-------|------------------------------------------------------------|
+| B-    | GND da moto                                                |
+| B+    | 12V pós-chave (o mesmo que alimenta o LM2596)              |
+| M+    | Motor JGY370                                               |
+| M-    | Motor JGY370                                               |
+
+```text
+12V pós-chave ──┬──> LM2596 (entrada)
+                └──> B+  (BTS7960)
+
+GND da moto ─────────> B-  (BTS7960)
+
+M+ ──────────> Motor JGY370
+M- ──────────> Motor JGY370
+```
 
 ---
 
@@ -410,13 +439,31 @@ Os dois GPIOs são utilizados para controle PWM do driver.
 
 ## 🔋 Alimentação
 
-O circuito utiliza duas tensões principais:
+A alimentação do circuito vem da moto, através de um conversor **LM2596**:
 
-| Tensão | Utilização                             |
-|--------|----------------------------------------|
-| 3.3V   | ESP32, 74HC14 e OLED                   |
-| 5V     | B05005S-1W e lógica do driver do motor |
-| GND    | Referência comum do circuito           |
+- **Entrada:** 12V pós-chave da moto
+- **Saída:** 5V
+
+```text
+12V pós-chave ──> LM2596 ──> 5V ──┬──> ESP32 (VIN)
+                                  ├──> BTS7960 (VCC, R_EN, L_EN)
+                                  └──> B05005S-1W (pino 2)
+
+GND da moto ──────────────────────┬──> LM2596 (GND)
+                                  ├──> ESP32 (GND)
+                                  └──> BTS7960 (GND e borne B-)
+```
+
+O ESP32 é alimentado pelos pinos **VIN** e **GND**.
+
+O circuito utiliza três tensões:
+
+| Tensão        | Utilização                                                   |
+|---------------|--------------------------------------------------------------|
+| 12V pós-chave | Entrada do LM2596 e borne B+ do BTS7960 (motor)              |
+| 5V            | ESP32 (VIN), BTS7960 (VCC, R_EN, L_EN) e B05005S-1W          |
+| 3.3V          | Lógica do ESP32, 74HC14 e OLED                               |
+| GND           | Referência comum do circuito (GND da moto)                   |
 
 > ⚠️ **Importante:** o sinal do acelerador é uma entrada analógica e deve permanecer conectado ao GPIO 32, sem passar pelo 74HC14.
 
@@ -429,7 +476,9 @@ O circuito utiliza duas tensões principais:
 - B05005S-1W
 - PC817
 - Display OLED I²C
-- Driver de motor
+- Driver de motor BTS7960
+- Motor JGY370 12 V 10 RPM
+- Conversor LM2596 (12 V → 5 V)
 - LED
 - Resistores
 - Capacitores de 100 nF
