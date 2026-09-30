@@ -1,6 +1,6 @@
 # 🏍️ Autopilot — Circuito de Controle
 
-Circuito baseado em **ESP32** para leitura dos sinais da motocicleta e controle do sistema de acionamento do motor.
+Circuito baseado em **ESP32** para leitura dos sinais da XRE 300 2013 e controle do sistema de acionamento do motor.
 
 O circuito possui:
 
