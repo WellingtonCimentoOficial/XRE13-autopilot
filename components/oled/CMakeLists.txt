@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS 
+        "src/oled.c"
+        "src/ssd1306.c"
+        "src/ssd1306_i2c_new.c"
+        "src/ssd1306_spi.c"
+    INCLUDE_DIRS 
+        "include"
+    REQUIRES 
+        esp_hall
+        log
+        config
+)

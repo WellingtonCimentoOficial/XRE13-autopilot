@@ -1,0 +1,20 @@
+idf_component_register(
+    SRCS 
+        "src/control_button.c"
+        "src/cruise_control.c"
+        "src/motor_control.c"
+        "src/speed_sensor.c"
+        "src/tps_sensor.c"
+        "src/clutch_sensor.c"
+        "src/brake_sensor.c"
+    INCLUDE_DIRS 
+        "include"
+    REQUIRES 
+        esp_hall
+        log
+        config
+        pid
+        oled
+        esp_timer
+        led
+)
