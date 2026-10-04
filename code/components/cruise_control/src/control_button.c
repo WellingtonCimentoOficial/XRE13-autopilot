@@ -24,7 +24,7 @@ bool control_button_is_pressed(void){
 }
 
 bool control_button_confirmed_press(void){
-    const TickType_t POLL_INTERVAL_MS = pdMS_TO_TICKS(5);
+    const TickType_t POLL_INTERVAL_MS = pdMS_TO_TICKS(10);
     
     TickType_t start = xTaskGetTickCount();
 

@@ -40,7 +40,7 @@
 #define BTN_CONTROL_CONFIRM_PRESS_TIME 1000
 
 // PID CONFIGURATIONS
-#define PID_KP 1.0f
+#define PID_KP 0.0f
 #define PID_KI 0.0f
 #define PID_KD 0.0f
 

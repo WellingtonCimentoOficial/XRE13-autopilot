@@ -1,0 +1,14 @@
+idf_component_register(
+    SRCS 
+        "src/ble.c"
+        "src/gap.c"
+        "src/gatt_svc.c"
+    INCLUDE_DIRS 
+        "include"
+    REQUIRES 
+        bt
+        nvs_flash
+        esp_driver_gpio
+        pid
+        oled
+)

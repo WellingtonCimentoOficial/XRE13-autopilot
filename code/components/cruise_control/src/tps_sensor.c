@@ -9,16 +9,17 @@
 static adc_oneshot_unit_handle_t tps_adc_handle;
 static adc_cali_handle_t tps_adc_cali_handle;
 
+
 float tps_get_throttle_position(){
     int raw = 0;
     int voltage = 0;
-
+    
     adc_read(tps_adc_handle, ACCELERATOR_SENSOR_CHANNEL, &raw);  
     adc_get_voltage(tps_adc_cali_handle, raw, &voltage);
-
+    
     float real_voltage = voltage / 1000.0f;
     float real_voltage_percent = ((real_voltage - ACCELERATOR_MINIMUM_VOLTAGE) / (ACCELERATOR_MAXIMUM_VOLTAGE - ACCELERATOR_MINIMUM_VOLTAGE)) * 100.0f;
-
+    
     if(real_voltage_percent < ACCELERATOR_MINIMUM_TOLERANCE){
         real_voltage_percent = 0.0f;
     }else if(real_voltage_percent > ACCELERATOR_MAXIMUM_TOLERANCE){
@@ -26,6 +27,22 @@ float tps_get_throttle_position(){
     }
     
     return real_voltage_percent;
+}
+
+bool tps_is_throttle_at_idle(){
+    if(tps_get_throttle_position() > ACCELERATOR_MINIMUM_TOLERANCE){
+        return false;
+    }
+
+    return true;
+}
+
+bool tps_is_throttle_at_max(){
+    if(tps_get_throttle_position() < ACCELERATOR_MAXIMUM_TOLERANCE){
+        return false;
+    }
+
+    return true;
 }
 
 adc_oneshot_unit_handle_t tps_get_adc_handle(){

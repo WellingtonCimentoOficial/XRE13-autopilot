@@ -41,29 +41,51 @@ float limit_pwm(float pid_output){
 }
 
 void motor_return_throttle_to_idle(void){
-    float current_throttle_position = tps_get_throttle_position();
-    if(current_throttle_position > ACCELERATOR_MINIMUM_TOLERANCE){
-        ESP_LOGI(__func__, "Throttle is not at idle (current: %.2f%%). Resetting position...", current_throttle_position);
-        motor_close_throttle(255);
-        while(current_throttle_position > ACCELERATOR_MINIMUM_TOLERANCE){
-            ESP_LOGI(__func__, "Resetting throttle: current position %.2f%% -> target 0%%.", current_throttle_position);
-            current_throttle_position = tps_get_throttle_position();
+    if(!tps_is_throttle_at_idle()){
+        ESP_LOGI(__func__, "Throttle is not at idle (current: %.2f%%). Resetting position...", tps_get_throttle_position());
+        
+        float last_correct_throttle_position = tps_get_throttle_position();
+        uint32_t last_correct_throttle_position_time = xTaskGetTickCount();
+        
+        while(!tps_is_throttle_at_idle()){
+            motor_close_throttle(255);
+
+            if(last_correct_throttle_position < tps_get_throttle_position()){
+                motor_stop();
+
+                while(last_correct_throttle_position < tps_get_throttle_position()){
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                    continue;
+                }
+
+                last_correct_throttle_position_time = xTaskGetTickCount();
+
+                while((xTaskGetTickCount() - last_correct_throttle_position_time) < pdMS_TO_TICKS(100)){
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                    continue;
+                }
+
+                last_correct_throttle_position = tps_get_throttle_position();
+            }
+
+            ESP_LOGI(__func__, "Resetting throttle: current position %.2f%% -> target 0%%.", tps_get_throttle_position());
             vTaskDelay(pdMS_TO_TICKS(10));
         }
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        
+        vTaskDelay(pdMS_TO_TICKS(500));
+        
         motor_stop();
+
         ESP_LOGI(__func__, "Throttle successfully reset to 0%%.\n");
     }
 }
 
 void motor_set_throttle_to_max(void){ // to test
-    float current_throttle_position = tps_get_throttle_position();
-    if(current_throttle_position < ACCELERATOR_MAXIMUM_TOLERANCE){
-        ESP_LOGI(__func__, "Throttle is not in max (current: %.2f%%). setting max position...", current_throttle_position);
+    if(!tps_is_throttle_at_max()){
+        ESP_LOGI(__func__, "Throttle is not in max (current: %.2f%%). setting max position...", tps_get_throttle_position());
         motor_open_throttle(255);
-        while(current_throttle_position < ACCELERATOR_MAXIMUM_TOLERANCE){
-            ESP_LOGI(__func__, "Setting throttle: current position %.2f%% -> target 100%%.", current_throttle_position);
-            current_throttle_position = tps_get_throttle_position();
+        while(!tps_is_throttle_at_max()){
+            ESP_LOGI(__func__, "Setting throttle: current position %.2f%% -> target 100%%.", tps_get_throttle_position());
             vTaskDelay(pdMS_TO_TICKS(10));
         }
         motor_stop();
@@ -72,24 +94,20 @@ void motor_set_throttle_to_max(void){ // to test
 }
 
 void motor_set_throttle(float throttle_position){ 
-    float current_throttle_position = tps_get_throttle_position();
-
     ESP_LOGI(__func__, "Waiting for throttle to be released...");
-    led_set_blink_now(true, 100);
-
-    while(current_throttle_position > ACCELERATOR_MINIMUM_TOLERANCE){
-        current_throttle_position = tps_get_throttle_position();
+    led_set_blink_now(true, 50);
+    
+    while(!tps_is_throttle_at_idle()){
         vTaskDelay(pdMS_TO_TICKS(10));
     }
     ESP_LOGI(__func__, "Throttle released.");
-
-    if(current_throttle_position < throttle_position){
+    
+    if(tps_get_throttle_position() < throttle_position){
         ESP_LOGI(__func__, "Setting throttle to %.2f%%...", throttle_position);
         led_set_blink_now(true, 200);
 
         motor_open_throttle(255);
-        while(current_throttle_position < throttle_position){
-            current_throttle_position = tps_get_throttle_position();
+        while(tps_get_throttle_position() < throttle_position){
             vTaskDelay(pdMS_TO_TICKS(10));
         }
         motor_stop();
@@ -101,12 +119,11 @@ void motor_set_throttle(float throttle_position){
 
 
 void motor_set_output(float pid_output){
-    float current_throttle_position = tps_get_throttle_position();
     float duty = limit_pwm(pid_output);
 
-    if(pid_output > 0 && current_throttle_position < ACCELERATOR_MAXIMUM_TOLERANCE){
+    if(pid_output > 0.0f && !tps_is_throttle_at_max()){
         motor_open_throttle(duty);
-    }else if(pid_output < 0 && current_throttle_position > ACCELERATOR_MINIMUM_TOLERANCE){
+    }else if(pid_output < 0.0f && !tps_is_throttle_at_idle()){
         motor_close_throttle(duty);
     }else{
         motor_stop();
