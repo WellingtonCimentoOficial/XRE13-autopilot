@@ -2,11 +2,9 @@
 #include <stdint.h>
 #include "config.h"
 #include "gpio_hall.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "esp_log.h"
-#include "oled.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
 
 volatile int64_t last_pulse_time = 0;
 volatile int64_t pulse_delta = 0;
@@ -56,20 +54,6 @@ float get_current_speed(){
     return last_speed_filtered;
 }
 
-void show_speed_task(void *pvParameters){
-    while(1){
-        char buffer[7];
-
-        float current_speed = get_current_speed();
-
-        snprintf(buffer, sizeof(buffer), "%-3.0f", current_speed);
-
-        oled_print(buffer, 5);
-
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-}
-
 void IRAM_ATTR speed_sensor_isr(void *args){ 
     int64_t now = esp_timer_get_time();
 
@@ -93,8 +77,6 @@ void IRAM_ATTR speed_sensor_isr(void *args){
 
 void speed_sensor_init(void){
     gpio_init(SPEED_SENSOR_GPIO, GPIO_MODE_INPUT, GPIO_PULLUP_DISABLE, GPIO_PULLDOWN_DISABLE, GPIO_INTR_POSEDGE);
-
-    xTaskCreate(show_speed_task, "show_speed_task", 2048, NULL, 3, NULL);
 
     gpio_isr_handler_add(SPEED_SENSOR_GPIO, speed_sensor_isr, NULL);
 

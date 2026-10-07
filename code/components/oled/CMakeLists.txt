@@ -10,4 +10,5 @@ idf_component_register(
         esp_hall
         log
         config
+        cruise_control
 )

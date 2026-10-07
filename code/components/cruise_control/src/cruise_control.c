@@ -13,61 +13,90 @@
 #include "brake_sensor.h"
 #include "clutch_sensor.h"
 #include "control_button.h"
-#include "oled.h"
 #include "led.h"
 #include "esp_timer.h"
+#include "oled.h"
 
 static float speed_target = 0;
 static bool is_ready = false;
-// static bool btn_control_is_pressed = false;
 static bool is_active = false;
 
-TaskHandle_t control_task_handle;
+TaskHandle_t pilot_task_handle;
+TaskHandle_t calibration_task_handle;
 
-TaskHandle_t get_control_task_handle(void){
-    return control_task_handle;
+TaskHandle_t get_pilot_task_handle(void){
+    return pilot_task_handle;
 }
 
-void control_task(void *pvParameter){
+TaskHandle_t get_calibration_task_handle(void){
+    return calibration_task_handle;
+}
+
+void calibration_task(void *pvParameter){
     while(1){
         xTaskNotifyWait(0, UINT32_MAX, NULL, portMAX_DELAY);
 
-        oled_print(".     ", 0);
-        
+        if(get_current_speed() != 0.0f || is_active){
+            continue;
+        }
+
+        if(!control_button_confirmed_press(5000)){
+            oled_show_error(OLED_ERROR_BUTTON_NOT_CONFIRMED);
+            continue;
+        }
+
+        led_set_blink_now(true, 50);
+
+        oled_show_motor_calibrating(true);
+        motor_calibrate();
+        oled_show_motor_calibrating(false);
+
+        led_set_blink_now(false, 50);
+
+        while(control_button_is_pressed()){
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
+        while(ulTaskNotifyTake(pdTRUE, 0) > 0){
+            ESP_LOGW(__func__, "Discarded spurious button trigger during hold.\n");
+        }
+    }
+}
+
+void pilot_task(void *pvParameter){
+    while(1){
+        xTaskNotifyWait(0, UINT32_MAX, NULL, portMAX_DELAY);
+
         float current_speed = get_current_speed();
         float current_throttle_position = tps_get_throttle_position();
 
-        // if(btn_control_is_pressed || !is_ready){
-        //     continue;
-        // }
-
         if(!is_ready){
-            oled_print("READY", 0);
+            oled_show_error(OLED_ERROR_NOT_READY);
             continue;
         }
 
-        if(!control_button_confirmed_press()){
-            oled_print("BUTTON", 0);
+        if(!control_button_confirmed_press(1000)){
+            oled_show_error(OLED_ERROR_BUTTON_NOT_CONFIRMED);
             continue;
         }
-
-        // btn_control_is_pressed = true;
-
+        
         if(brake_sensor_is_pressed()){
-            oled_print("BRAKE", 0);
+            oled_show_error(OLED_ERROR_BRAKE_ACTIVE);
             ESP_LOGI(__func__, "Auto pilot not enabled because the brake is pressed.\n");
+            
             continue;
         }
-
+        
         // if(clutch_is_actuated()){
-        //     oled_print("ACT", 0);
-        //     ESP_LOGI(__func__, "Auto pilot not enabled because the clutch is actuated.\n");
-        //     continue;
-        // }
-
-        if(current_speed < MINIMUM_SPEED_LIMIT){
-            oled_print("SPEED", 0);
+            //     oled_show_error(OLED_ERROR_CLUTCH_ACTIVE);
+            //     ESP_LOGI(__func__, "Auto pilot not enabled because the clutch is actuated.\n");
+            //     continue;
+            // }
+            
+            if(current_speed < MINIMUM_SPEED_LIMIT){
+            oled_show_error(OLED_ERROR_SPEED_TOO_LOW);
             ESP_LOGI(__func__, "Auto pilot not enabled because the speed is below %d km/h.\n", MINIMUM_SPEED_LIMIT);
+            
             continue;
         }
 
@@ -84,8 +113,6 @@ void control_task(void *pvParameter){
         while(ulTaskNotifyTake(pdTRUE, 0) > 0){
             ESP_LOGW(__func__, "Discarded spurious button trigger during hold.\n");
         }
-
-        // btn_control_is_pressed = false;
     }
 }
 
@@ -103,13 +130,6 @@ void cruise_control_task(void *pvParameter){
             float acceleration_error = speed_target - current_speed;
             float pid_output = pid_calculate(acceleration_error, elapsed_time_s);
 
-            // float throttle_position = tps_get_throttle_position();
-
-            // char buffer[7];
-            // snprintf(buffer, sizeof(buffer), "%-3.2f", throttle_position);
-
-            // oled_print(buffer, 0);
-
             motor_set_output(pid_output);
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -122,10 +142,6 @@ void enable_auto_pilot(float speed, float throttle_position){
     speed_target = speed;
     is_active = true;
     
-    char buffer[7];
-    snprintf(buffer, sizeof(buffer), "%-3.0f", speed_target);
-    oled_print(buffer, 0);
-
     led_turn_on();
     
     ESP_LOGI(__func__, "Speed target set to %.0f km/h.", speed);
@@ -141,8 +157,6 @@ void disable_auto_pilot(){
     motor_return_throttle_to_idle();
     led_turn_off();
 
-    oled_print("   ", 0);
-
     is_ready = true;
 
     ESP_LOGI(__func__, "Auto pilot disabled.\n");
@@ -157,12 +171,10 @@ float get_speed_target(){
 }
 
 void cruise_control_init(){
-    // if(get_current_speed() == 0.0f){
-    //     motor_set_throttle_to_max();
-    // }
     motor_return_throttle_to_idle();
 
-    xTaskCreate(control_task, "control_task", 4096, NULL, 4, &control_task_handle);
+    xTaskCreate(pilot_task, "pilot_task", 2048, NULL, 4, &pilot_task_handle);
+    xTaskCreate(calibration_task, "calibration_task", 2048, NULL, 4, &calibration_task_handle);
     xTaskCreate(cruise_control_task, "cruise_control_task", 2048, NULL, 3, NULL);
 
     is_ready = true;

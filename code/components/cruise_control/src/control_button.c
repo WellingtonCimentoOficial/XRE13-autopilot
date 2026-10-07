@@ -6,7 +6,6 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include <stdbool.h>
-#include "oled.h"
 
 static volatile uint32_t btn_control_last_interrupt = 0;
 
@@ -15,7 +14,8 @@ void IRAM_ATTR btn_control_isr(void *args){
 
     if(btn_control_last_interrupt == 0 || ((now - btn_control_last_interrupt) > pdMS_TO_TICKS(BTN_CONTROL_DEBOUNCE_TIME))){
         btn_control_last_interrupt = now;
-        xTaskNotifyFromISR(get_control_task_handle(), 0, eNoAction, NULL);
+        xTaskNotifyFromISR(get_pilot_task_handle(), 0, eNoAction, NULL);
+        xTaskNotifyFromISR(get_calibration_task_handle(), 0, eNoAction, NULL);
     }
 }
 
@@ -23,9 +23,7 @@ bool control_button_is_pressed(void){
     return gpio_get(BTN_CONTROL_GPIO) == GPIO_OFF;
 }
 
-bool control_button_confirmed_press(void){
-    const TickType_t POLL_INTERVAL_MS = pdMS_TO_TICKS(10);
-    
+bool control_button_confirmed_press(uint32_t time_in_ms){
     TickType_t start = xTaskGetTickCount();
 
     ESP_LOGI(__func__, "Button press confirmation initiated.");
@@ -33,11 +31,11 @@ bool control_button_confirmed_press(void){
     while(control_button_is_pressed()){
         TickType_t elapsed = xTaskGetTickCount() - start;
 
-        if(elapsed >= pdMS_TO_TICKS(BTN_CONTROL_CONFIRM_PRESS_TIME)){
+        if(elapsed >= pdMS_TO_TICKS(time_in_ms)){
             ESP_LOGI(__func__, "Pressing the confirmed button.");
             return true;
         }
-        vTaskDelay(POLL_INTERVAL_MS);
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 
     return false;

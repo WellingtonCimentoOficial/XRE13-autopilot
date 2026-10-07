@@ -201,6 +201,67 @@ void ssd1306_display_text_box2(SSD1306_t * dev, int page, int seg, const char * 
 	}
 }
 
+void ssd1306_display_text_x2(SSD1306_t *dev, int page, const char *text, int text_len, bool invert)
+{
+    if (page >= dev->_pages) return;
+
+    int _text_len = text_len;
+    if (_text_len > 8) _text_len = 8;
+
+    int seg = 0;
+
+    for (int nn = 0; nn < _text_len; nn++) {
+
+        uint8_t const * const in_columns =
+            font8x8_basic_tr[(uint8_t)text[nn]];
+
+        // Make each pixel 2x2
+        uint16_t out_columns[8];
+        memset(out_columns, 0, sizeof(out_columns));
+
+        for (int xx = 0; xx < 8; xx++) {
+
+            uint16_t in_bitmask = 0b1;
+            uint16_t out_bitmask = 0b11;
+
+            for (int yy = 0; yy < 8; yy++) {
+
+                if (in_columns[xx] & in_bitmask) {
+                    out_columns[xx] |= out_bitmask;
+                }
+
+                in_bitmask <<= 1;
+                out_bitmask <<= 2;
+            }
+        }
+
+        // Render character in 2 groups of 8 pixels high
+        for (int yy = 0; yy < 2; yy++) {
+
+            uint8_t image[16];
+
+            for (int xx = 0; xx < 8; xx++) {
+
+                image[xx * 2 + 0] = out_columns[xx] >> (yy * 8);
+                image[xx * 2 + 1] = image[xx * 2 + 0];
+            }
+
+            if (invert) ssd1306_invert(image, 16);
+            if (dev->_flip) ssd1306_flip(image, 16);
+
+            if (dev->_address == SPI_ADDRESS) {
+                spi_display_image(dev, page + yy, seg, image, 16);
+            } else {
+                i2c_display_image(dev, page + yy, seg, image, 16);
+            }
+
+            memcpy(&dev->_page[page + yy]._segs[seg], image, 16);
+        }
+
+        seg += 16;
+    }
+}
+
 // by Coert Vonk
 void 
 ssd1306_display_text_x3(SSD1306_t * dev, int page, const char * text, int text_len, bool invert)

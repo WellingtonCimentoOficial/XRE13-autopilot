@@ -54,7 +54,9 @@ static int led_chr_access(uint16_t conn_handle,
                 printf("Command not found.");
         }
 
-        oled_print(value, 0);
+        char buffer[10];
+        snprintf(buffer, sizeof(buffer), "%c %2.2f", identifier, val);
+        oled_print(buffer, 3, OLED_FONT_MEDIUM);
 
         return 0;
     }

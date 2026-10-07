@@ -47,32 +47,40 @@ void motor_return_throttle_to_idle(void){
         float last_correct_throttle_position = tps_get_throttle_position();
         uint32_t last_correct_throttle_position_time = xTaskGetTickCount();
         
-        while(!tps_is_throttle_at_idle()){
-            motor_close_throttle(255);
-
-            if(last_correct_throttle_position < tps_get_throttle_position()){
-                motor_stop();
-
-                while(last_correct_throttle_position < tps_get_throttle_position()){
-                    vTaskDelay(pdMS_TO_TICKS(10));
-                    continue;
+        while(1){
+            while(!tps_is_throttle_at_idle()){
+                motor_close_throttle(255);
+    
+                if(last_correct_throttle_position < tps_get_throttle_position()){
+                    motor_stop();
+    
+                    while(last_correct_throttle_position < tps_get_throttle_position()){
+                        vTaskDelay(pdMS_TO_TICKS(10));
+                        continue;
+                    }
+    
+                    last_correct_throttle_position_time = xTaskGetTickCount();
+    
+                    while((xTaskGetTickCount() - last_correct_throttle_position_time) < pdMS_TO_TICKS(500)){
+                        vTaskDelay(pdMS_TO_TICKS(10));
+                        continue;
+                    }
+    
+                    last_correct_throttle_position = tps_get_throttle_position();
                 }
-
-                last_correct_throttle_position_time = xTaskGetTickCount();
-
-                while((xTaskGetTickCount() - last_correct_throttle_position_time) < pdMS_TO_TICKS(100)){
-                    vTaskDelay(pdMS_TO_TICKS(10));
-                    continue;
-                }
-
-                last_correct_throttle_position = tps_get_throttle_position();
+    
+                ESP_LOGI(__func__, "Resetting throttle: current position %.2f%% -> target 0%%.", tps_get_throttle_position());
+                vTaskDelay(pdMS_TO_TICKS(10));
             }
 
-            ESP_LOGI(__func__, "Resetting throttle: current position %.2f%% -> target 0%%.", tps_get_throttle_position());
-            vTaskDelay(pdMS_TO_TICKS(10));
+            vTaskDelay(pdMS_TO_TICKS(500));
+
+            if(tps_is_throttle_at_idle()){
+                break;
+            }
         }
-        
-        vTaskDelay(pdMS_TO_TICKS(500));
+
+        vTaskDelay(pdMS_TO_TICKS(300));
         
         motor_stop();
 
@@ -91,6 +99,11 @@ void motor_set_throttle_to_max(void){ // to test
         motor_stop();
         ESP_LOGI(__func__, "Throttle successfully set to 100%%.\n");
     }
+}
+
+void motor_calibrate(void){
+    motor_set_throttle_to_max();
+    motor_return_throttle_to_idle();
 }
 
 void motor_set_throttle(float throttle_position){ 
