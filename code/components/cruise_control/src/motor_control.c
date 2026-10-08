@@ -41,6 +41,8 @@ float limit_pwm(float pid_output){
 }
 
 void motor_return_throttle_to_idle(void){
+    motor_stop();
+    
     if(!tps_is_throttle_at_idle()){
         ESP_LOGI(__func__, "Throttle is not at idle (current: %.2f%%). Resetting position...", tps_get_throttle_position());
         

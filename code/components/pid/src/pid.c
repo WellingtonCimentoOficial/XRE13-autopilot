@@ -6,8 +6,8 @@ static float integral = 0;
 static float last_error = 0;
 
 static float _kp = 10.0f;
-static float _ki = 5.0f;
-static float _kd = 0;
+static float _ki = 0;
+static float _kd = 20.0f;
  
 void set_kp(float kp){
     _kp = kp;
