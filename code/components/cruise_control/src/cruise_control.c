@@ -26,6 +26,7 @@ typedef enum {
 
 TaskHandle_t pilot_task_handle;
 TaskHandle_t calibration_task_handle;
+TaskHandle_t emergency_release_task_handle;
 
 static float speed_target = 0;
 
@@ -39,6 +40,39 @@ TaskHandle_t get_calibration_task_handle(void){
     return calibration_task_handle;
 }
 
+TaskHandle_t get_emergency_release_task_handle(void){
+    return emergency_release_task_handle;
+}
+
+void emergency_release_task(void *pvParameter){
+    while(1){
+        xTaskNotifyWait(0, UINT32_MAX, NULL, portMAX_DELAY);
+
+        if(get_current_speed() != 0.0f || auto_pilot_is_active()){
+            continue;
+        }
+
+        if(!control_button_confirmed_press(8000)){
+            oled_show_message(OLED_MESSAGE_BUTTON_NOT_CONFIRMED);
+            continue;
+        }
+
+        led_set_blink_now(true, 50);
+
+        motor_close_throttle(255);
+
+        oled_show_motor_emergency_releasing(true);
+
+        while(control_button_is_pressed()){
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
+        while(ulTaskNotifyTake(pdTRUE, 0) > 0){
+            ESP_LOGW(__func__, "Discarded spurious button trigger during hold.\n");
+        }
+    }
+}
+
 void calibration_task(void *pvParameter){
     while(1){
         xTaskNotifyWait(0, UINT32_MAX, NULL, portMAX_DELAY);
@@ -47,12 +81,17 @@ void calibration_task(void *pvParameter){
             continue;
         }
 
-        if(!control_button_confirmed_press(5000)){
+        if(!control_button_confirmed_press(3000)){
             oled_show_message(OLED_MESSAGE_BUTTON_NOT_CONFIRMED);
             continue;
         }
 
         led_set_blink_now(true, 50);
+        
+        if(control_button_confirmed_press(3000)){
+            led_set_blink_now(false, 50);
+            continue;
+        }
 
         oled_show_motor_calibrating(true);
         motor_calibrate();
@@ -78,7 +117,7 @@ void pilot_task(void *pvParameter){
         float current_throttle_position = tps_get_throttle_position();
 
         if(autopilot_state != AUTOPILOT_DISABLED){
-            oled_show_message(OLED_MESSAGE_NOT_READY); // mudarrrrr
+            oled_show_message(OLED_MESSAGE_AUTOPILOT_BUSY);
             continue;
         }
 
@@ -185,6 +224,7 @@ void cruise_control_init(){
 
     xTaskCreate(pilot_task, "pilot_task", 2048, NULL, 4, &pilot_task_handle);
     xTaskCreate(calibration_task, "calibration_task", 2048, NULL, 4, &calibration_task_handle);
+    xTaskCreate(emergency_release_task, "emergency_release_task", 2048, NULL, 4, &emergency_release_task_handle);
     xTaskCreate(cruise_control_task, "cruise_control_task", 2048, NULL, 3, NULL);
 
     ESP_LOGI(__func__, "Cruise control initialized successfully.");

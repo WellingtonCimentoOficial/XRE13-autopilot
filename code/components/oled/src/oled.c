@@ -18,6 +18,7 @@ static SSD1306_t dev;
 static bool was_initialized = false;
 static oled_message_t oled_message = OLED_MESSAGE_NONE;
 static bool oled_motor_calibrating = false;
+static bool oled_emergency_releasing = false;
 
 static char* oled_get_message();
 static void oled_print(char *text, int line, oled_font_t font);
@@ -26,7 +27,8 @@ typedef enum {
     OLED_MODE_OFF,
     OLED_MODE_ACTIVE,
     OLED_MODE_CALIBRATING,
-    OLED_MODE_ERROR
+    OLED_MODE_WARNING,
+    OLED_MODE_EMERGENCY_RELEASING
 } oled_mode_t;
 
 void oled_task(void *arg){
@@ -40,12 +42,16 @@ void oled_task(void *arg){
 
         char buffer[17];
 
-        if(oled_motor_calibrating){
+        if(oled_emergency_releasing){
+            current_mode = OLED_MODE_EMERGENCY_RELEASING;
+        }
+
+        else if(oled_motor_calibrating){
             current_mode = OLED_MODE_CALIBRATING;
         }
         
         else if(oled_message != OLED_MESSAGE_NONE){
-            current_mode = OLED_MODE_ERROR;
+            current_mode = OLED_MODE_WARNING;
         }
         
         else if(auto_pilot_is_active()){
@@ -61,7 +67,15 @@ void oled_task(void *arg){
             last_mode = current_mode;
         }
 
-        if(current_mode == OLED_MODE_CALIBRATING){
+        if(current_mode == OLED_MODE_EMERGENCY_RELEASING){
+            oled_print("RELEASE", 3, OLED_FONT_MEDIUM);
+
+            vTaskDelay(pdMS_TO_TICKS(10));
+
+            continue;
+        }
+
+        else if(current_mode == OLED_MODE_CALIBRATING){
             oled_print("CALIB...", 0, OLED_FONT_MEDIUM);
 
             snprintf(buffer, sizeof(buffer), "TPS %3.0f%%", throttle_position);
@@ -72,7 +86,7 @@ void oled_task(void *arg){
             continue;
         }
         
-        else if(current_mode == OLED_MODE_ERROR){
+        else if(current_mode == OLED_MODE_WARNING){
             oled_print(" ALERT ", 0, OLED_FONT_MEDIUM);
 
             oled_print("   |   ", 2, OLED_FONT_MEDIUM);
@@ -110,8 +124,8 @@ void oled_task(void *arg){
 
 static char* oled_get_message(){
     switch (oled_message){
-    case OLED_MESSAGE_NOT_READY:
-        return "Ready";
+    case OLED_MESSAGE_AUTOPILOT_BUSY:
+        return "Busy";
     case OLED_MESSAGE_BUTTON_NOT_CONFIRMED:
         return "Button";
     case OLED_MESSAGE_SPEED_TOO_LOW:
@@ -130,6 +144,10 @@ void oled_show_message(oled_message_t message){
 
 void oled_show_motor_calibrating(bool show){
     oled_motor_calibrating = show;
+}
+
+void oled_show_motor_emergency_releasing(bool show){
+    oled_emergency_releasing = show;
 }
 
 void oled_print(char *text, int line, oled_font_t font){

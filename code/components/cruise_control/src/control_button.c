@@ -6,6 +6,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include <stdbool.h>
+#include "esp_timer.h"
 
 static volatile uint32_t btn_control_last_interrupt = 0;
 
@@ -16,6 +17,7 @@ void IRAM_ATTR btn_control_isr(void *args){
         btn_control_last_interrupt = now;
         xTaskNotifyFromISR(get_pilot_task_handle(), 0, eNoAction, NULL);
         xTaskNotifyFromISR(get_calibration_task_handle(), 0, eNoAction, NULL);
+        xTaskNotifyFromISR(get_emergency_release_task_handle(), 0, eNoAction, NULL);
     }
 }
 
@@ -24,14 +26,14 @@ bool control_button_is_pressed(void){
 }
 
 bool control_button_confirmed_press(uint32_t time_in_ms){
-    TickType_t start = xTaskGetTickCount();
+    int64_t start = esp_timer_get_time();
 
     ESP_LOGI(__func__, "Button press confirmation initiated.");
 
     while(control_button_is_pressed()){
-        TickType_t elapsed = xTaskGetTickCount() - start;
+        float elapsed_time_ms = (esp_timer_get_time() - start) / 1000.0f;
 
-        if(elapsed >= pdMS_TO_TICKS(time_in_ms)){
+        if(elapsed_time_ms >= time_in_ms){
             ESP_LOGI(__func__, "Pressing the confirmed button.");
             return true;
         }

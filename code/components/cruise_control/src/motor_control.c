@@ -9,7 +9,7 @@
 #include "tps_sensor.h"
 #include "led.h"
 
-void motor_open_throttle(float duty){
+static void motor_open_throttle(float duty){
     pwm_set_duty(MOTOR_DECELERATION_PWM_CHANNEL, 0);
 
     pwm_set_duty(MOTOR_ACCELERATION_PWM_CHANNEL, duty);
@@ -28,7 +28,7 @@ void motor_stop(void){
     ESP_LOGI(__func__, "Accelerate duty and decelerate duty set to 0.");
 }
 
-float limit_pwm(float pid_output){
+static float limit_pwm(float pid_output){
     uint32_t pwm_limit = (1 << PWM_DUTY_RESOULTION) - 1;
 
     pid_output = fabsf(pid_output);

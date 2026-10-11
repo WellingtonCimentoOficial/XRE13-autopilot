@@ -11,4 +11,5 @@ bool auto_pilot_is_active(void);
 float get_speed_target(void);
 TaskHandle_t get_pilot_task_handle(void);
 TaskHandle_t get_calibration_task_handle(void);
+TaskHandle_t get_emergency_release_task_handle(void);
 void cruise_control_init(void);
