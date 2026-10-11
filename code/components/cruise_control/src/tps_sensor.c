@@ -30,7 +30,7 @@ float tps_get_throttle_position(){
 }
 
 bool tps_is_throttle_at_idle(){
-    if(tps_get_throttle_position() > ACCELERATOR_MINIMUM_TOLERANCE){
+    if(tps_get_throttle_position() > 0.0f){
         return false;
     }
 
@@ -38,7 +38,7 @@ bool tps_is_throttle_at_idle(){
 }
 
 bool tps_is_throttle_at_max(){
-    if(tps_get_throttle_position() < ACCELERATOR_MAXIMUM_TOLERANCE){
+    if(tps_get_throttle_position() < 100.0f){
         return false;
     }
 

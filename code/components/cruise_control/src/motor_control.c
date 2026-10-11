@@ -47,7 +47,7 @@ void motor_return_throttle_to_idle(void){
         ESP_LOGI(__func__, "Throttle is not at idle (current: %.2f%%). Resetting position...", tps_get_throttle_position());
         
         float last_correct_throttle_position = tps_get_throttle_position();
-        uint32_t last_correct_throttle_position_time = xTaskGetTickCount();
+        int last_correct_throttle_position_time = xTaskGetTickCount();
         
         while(1){
             while(!tps_is_throttle_at_idle()){
@@ -82,7 +82,7 @@ void motor_return_throttle_to_idle(void){
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(300));
+        vTaskDelay(pdMS_TO_TICKS(500));
         
         motor_stop();
 
@@ -90,7 +90,7 @@ void motor_return_throttle_to_idle(void){
     }
 }
 
-void motor_set_throttle_to_max(void){ // to test
+void motor_set_throttle_to_max(void){
     if(!tps_is_throttle_at_max()){
         ESP_LOGI(__func__, "Throttle is not in max (current: %.2f%%). setting max position...", tps_get_throttle_position());
         motor_open_throttle(255);
@@ -108,7 +108,7 @@ void motor_calibrate(void){
     motor_return_throttle_to_idle();
 }
 
-void motor_set_throttle(float throttle_position){ 
+void motor_pre_accelerate(float throttle_position){ 
     ESP_LOGI(__func__, "Waiting for throttle to be released...");
     led_set_blink_now(true, 50);
     

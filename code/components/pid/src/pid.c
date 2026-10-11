@@ -5,45 +5,17 @@
 static float integral = 0;
 static float last_error = 0;
 
-static float _kp = 10.0f;
-static float _ki = 0;
-static float _kd = 20.0f;
- 
-void set_kp(float kp){
-    _kp = kp;
-}
-
-float get_kp(){
-    return _kp;
-}
-
-void set_ki(float ki){
-    _ki = ki;
-}
-
-float get_ki(){
-    return _ki;
-}
-
-void set_kd(float kd){
-    _kd = kd;
-}
-
-float get_kd(){
-    return _kd;
-}
-
 float kp(float err){
-    return err * _kp;
+    return err * PID_KP;
 }
 
 float ki(float err){
     integral += err;
-    return integral * _ki;
+    return integral * PID_KI;
 }
 
 float kd(float err, float elapsed_time_s){
-    float der = _kd * ((err - last_error) / elapsed_time_s);
+    float der = PID_KD * ((err - last_error) / elapsed_time_s);
     last_error = err;
     return der;
 }

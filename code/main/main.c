@@ -12,7 +12,6 @@
 #include "led.h"
 #include "adc_hall.h"
 #include "esp_adc/adc_oneshot.h"
-#include "ble.h"
 
 void app_main(void)
 {
@@ -29,5 +28,4 @@ void app_main(void)
     oled_init();
     speed_sensor_init();
     cruise_control_init();
-    ble_init();
 }

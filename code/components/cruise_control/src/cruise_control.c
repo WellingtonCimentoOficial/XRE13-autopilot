@@ -17,12 +17,19 @@
 #include "esp_timer.h"
 #include "oled.h"
 
-static float speed_target = 0;
-static bool is_ready = false;
-static bool is_active = false;
+typedef enum {
+    AUTOPILOT_DISABLED,
+    AUTOPILOT_ACTIVATING,
+    AUTOPILOT_ACTIVE,
+    AUTOPILOT_DEACTIVATING
+} autopilot_state_t;
 
 TaskHandle_t pilot_task_handle;
 TaskHandle_t calibration_task_handle;
+
+static float speed_target = 0;
+
+static autopilot_state_t autopilot_state = AUTOPILOT_DISABLED;
 
 TaskHandle_t get_pilot_task_handle(void){
     return pilot_task_handle;
@@ -36,12 +43,12 @@ void calibration_task(void *pvParameter){
     while(1){
         xTaskNotifyWait(0, UINT32_MAX, NULL, portMAX_DELAY);
 
-        if(get_current_speed() != 0.0f || is_active){
+        if(get_current_speed() != 0.0f || auto_pilot_is_active()){
             continue;
         }
 
         if(!control_button_confirmed_press(5000)){
-            oled_show_error(OLED_ERROR_BUTTON_NOT_CONFIRMED);
+            oled_show_message(OLED_MESSAGE_BUTTON_NOT_CONFIRMED);
             continue;
         }
 
@@ -70,31 +77,31 @@ void pilot_task(void *pvParameter){
         float current_speed = get_current_speed();
         float current_throttle_position = tps_get_throttle_position();
 
-        if(!is_ready){
-            oled_show_error(OLED_ERROR_NOT_READY);
+        if(autopilot_state != AUTOPILOT_DISABLED){
+            oled_show_message(OLED_MESSAGE_NOT_READY); // mudarrrrr
             continue;
         }
 
         if(!control_button_confirmed_press(1000)){
-            oled_show_error(OLED_ERROR_BUTTON_NOT_CONFIRMED);
+            oled_show_message(OLED_MESSAGE_BUTTON_NOT_CONFIRMED);
             continue;
         }
         
         if(brake_sensor_is_pressed()){
-            oled_show_error(OLED_ERROR_BRAKE_ACTIVE);
+            oled_show_message(OLED_MESSAGE_BRAKE_ACTIVE);
             ESP_LOGI(__func__, "Auto pilot not enabled because the brake is pressed.\n");
             
             continue;
         }
         
         // if(clutch_is_actuated()){
-            //     oled_show_error(OLED_ERROR_CLUTCH_ACTIVE);
+            //     oled_show_message(OLED_MESSAGE_CLUTCH_ACTIVE);
             //     ESP_LOGI(__func__, "Auto pilot not enabled because the clutch is actuated.\n");
             //     continue;
             // }
             
             if(current_speed < MINIMUM_SPEED_LIMIT){
-            oled_show_error(OLED_ERROR_SPEED_TOO_LOW);
+            oled_show_message(OLED_MESSAGE_SPEED_TOO_LOW);
             ESP_LOGI(__func__, "Auto pilot not enabled because the speed is below %d km/h.\n", MINIMUM_SPEED_LIMIT);
             
             continue;
@@ -137,33 +144,36 @@ void cruise_control_task(void *pvParameter){
 }
 
 void enable_auto_pilot(float speed, float throttle_position){
-    motor_set_throttle(throttle_position);
+    autopilot_state = AUTOPILOT_ACTIVATING;
+
+    motor_pre_accelerate(throttle_position);
     
     speed_target = speed;
-    is_active = true;
     
     led_turn_on();
+
+    autopilot_state = AUTOPILOT_ACTIVE;
     
     ESP_LOGI(__func__, "Speed target set to %.0f km/h.", speed);
     ESP_LOGI(__func__, "Auto pilot enabled.\n");
 }
 
 void disable_auto_pilot(){
-    is_active = false;
+    autopilot_state = AUTOPILOT_DEACTIVATING;
+
     speed_target = 0;
-    is_ready = false;
 
     reset_pid();
     motor_return_throttle_to_idle();
     led_turn_off();
 
-    is_ready = true;
+    autopilot_state = AUTOPILOT_DISABLED;
 
     ESP_LOGI(__func__, "Auto pilot disabled.\n");
 }
 
 bool auto_pilot_is_active(){
-    return is_active;
+    return autopilot_state == AUTOPILOT_ACTIVE;
 }
 
 float get_speed_target(){
@@ -176,8 +186,6 @@ void cruise_control_init(){
     xTaskCreate(pilot_task, "pilot_task", 2048, NULL, 4, &pilot_task_handle);
     xTaskCreate(calibration_task, "calibration_task", 2048, NULL, 4, &calibration_task_handle);
     xTaskCreate(cruise_control_task, "cruise_control_task", 2048, NULL, 3, NULL);
-
-    is_ready = true;
 
     ESP_LOGI(__func__, "Cruise control initialized successfully.");
 }

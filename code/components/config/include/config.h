@@ -39,9 +39,9 @@
 #define BTN_CONTROL_DEBOUNCE_TIME 180
 
 // PID CONFIGURATIONS
-#define PID_KP 0.0f
+#define PID_KP 10.0f
 #define PID_KI 0.0f
-#define PID_KD 0.0f
+#define PID_KD 20.0f
 
 // DISPLAY OLED CONFIGURATIONS
 #define I2C_MASTER_SCL_GPIO         22
