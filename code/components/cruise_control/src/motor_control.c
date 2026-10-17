@@ -82,7 +82,7 @@ void motor_return_throttle_to_idle(void){
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(1000));
         
         motor_stop();
 
